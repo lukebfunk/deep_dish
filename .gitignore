@@ -10,6 +10,7 @@ data/
 runs/
 *.tif
 *.tiff
+*.swp
 
 # C extensions
 *.so
