@@ -1,9 +1,9 @@
 from setuptools import setup
 
 setup(
-    name='deep_dish',
+    name='gemelli',
     version='0.1',
-    url='https://github.com/lukebfunk/deep_dish',
+    url='https://github.com/lukebfunk/gemelli',
     packages=[
-        'deep_dish',
+        'gemelli',
         ])
