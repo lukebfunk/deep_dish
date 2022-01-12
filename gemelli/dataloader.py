@@ -3,7 +3,7 @@ from torch.utils.data.sampler import WeightedRandomSampler
 from torch.utils.data import DataLoader
 
 class BalancedDataLoader(DataLoader):
-    def __init__(self,dataset,batch_size):
+    def __init__(self,dataset,batch_size,**kwargs):
         ys = dataset.metadata['gene_id']
         counts = np.bincount(ys)
         label_weights = 1.0 / counts
@@ -15,4 +15,4 @@ class BalancedDataLoader(DataLoader):
 
         sampler = WeightedRandomSampler(weights,len(weights))
 
-        super().__init__(dataset,batch_size=batch_size,drop_last=True,sampler=sampler)
+        super().__init__(dataset,batch_size=batch_size,drop_last=True,sampler=sampler,**kwargs)
