@@ -13,6 +13,7 @@ class VggModule(LightningModule):
         self.weighted_accuracy = torchmetrics.Accuracy(average='weighted',num_classes=output_classes)
         self.softmax = torch.nn.Softmax(dim=1)
         self.learning_rate = learning_rate
+        self.confusion_matrix = torchmetrics.ConfusionMatrix(num_classes=output_classes,compute_on_step=False,normalize='true')
     
     def forward(self,x):
         x = self.model(x)
@@ -43,6 +44,17 @@ class VggModule(LightningModule):
         self.log("val_accuracy",self.accuracy,prog_bar=True)
         self.log("val_weighted_accuracy",self.weighted_accuracy,prog_bar=True)
 
+    def test_step(self, batch, batch_idx):
+        x,y = batch
+        logits = self(x)
+        loss = self.loss(logits,y)
+        y_hat = self.softmax(logits)
+        self.confusion_matrix(y_hat,y)
+    
+    def test_epoch_end(self, outputs):
+        self.cm = self.confusion_matrix.compute()
+        self.confusion_matrix.reset()
+
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         return optimizer
@@ -56,6 +68,7 @@ class ResNetModule(LightningModule):
         self.weighted_accuracy = torchmetrics.Accuracy(average='weighted',num_classes=output_classes)
         self.softmax = torch.nn.Softmax(dim=1)
         self.learning_rate = learning_rate
+        self.confusion_matrix = torchmetrics.ConfusionMatrix(num_classes=output_classes,compute_on_step=False,normalize='true')
 
     def forward(self,x):
         x = self.model(x)
@@ -84,7 +97,18 @@ class ResNetModule(LightningModule):
         self.accuracy(y_hat,y)
         self.weighted_accuracy(y_hat,y)
         self.log("val_accuracy",self.accuracy,prog_bar=True)
-        self.log("val_weighted_accuracy",self.weighted_accuracy,prog_bar=True)        
+        self.log("val_weighted_accuracy",self.weighted_accuracy,prog_bar=True)
+
+    def test_step(self, batch, batch_idx):
+        x,y = batch
+        logits = self(x)
+        loss = self.loss(logits,y)
+        y_hat = self.softmax(logits)
+        self.confusion_matrix(y_hat,y)
+    
+    def test_epoch_end(self, outputs):
+        self.cm = self.confusion_matrix.compute()
+        self.confusion_matrix.reset()
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
