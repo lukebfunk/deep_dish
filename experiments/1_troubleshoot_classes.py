@@ -1,6 +1,5 @@
 import argparse
 import pytorch_lightning as pl
-import torch
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 
@@ -18,8 +17,8 @@ args = parser.parse_args()
 
 input_size=(args.input_size,args.input_size)
 
-train_dataset  = CellPatchesDataset('~/gemelli/dataset_info/0_train_samples.csv',input_size=input_size,use_mask=args.use_mask,augment=False)
-val_dataset = CellPatchesDataset('~/gemelli/dataset_info/0_val_samples.csv',input_size=input_size,use_mask=args.use_mask,augment=False)
+train_dataset  = CellPatchesDataset('~/gemelli/dataset_info/0_train_samples.csv',input_size=input_size,use_mask=args.use_mask)
+val_dataset = CellPatchesDataset('~/gemelli/dataset_info/0_val_samples.csv',input_size=input_size,use_mask=args.use_mask)
 
 assert train_dataset.n_classes==val_dataset.n_classes
 
@@ -34,18 +33,14 @@ print(model.learning_rate)
 logger = TensorBoardLogger("logs",name=args.model_name)
 
 checkpoint_callback = ModelCheckpoint(
-        monitor='val_loss',
+        monitor='val_accuracy',
         filename='epoch{epoch:02d}-val_accuracy{val_accuracy:.2f}',
         auto_insert_metric_name=False,
         save_last=True,
-        # mode='max'
+        mode='max'
     )
 
-trainer = pl.Trainer.from_argparse_args(args, logger=logger, callbacks=[checkpoint_callback], max_epochs=250)
-print(f"Validation every {trainer.check_val_every_n_epoch} epochs")
+#trainer = pl.Trainer.from_argparse_args(args, logger=logger, callbacks=[checkpoint_callback], max_epochs=250)
 
-trainer.fit(
-    model,
-    torch.utils.data.DataLoader(train_dataset, batch_size=16,num_workers=10,shuffle=True),
-    torch.utils.data.DataLoader(val_dataset, batch_size=16,num_workers=10)
-)
+train_dataloader = BalancedDataLoader(train_dataset, batch_size=16,num_workers=0),
+val_dataloader = BalancedDataLoader(val_dataset, batch_size=16,num_workers=0,shuffle=False)

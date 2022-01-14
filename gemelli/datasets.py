@@ -1,14 +1,16 @@
 import numpy as np
 import pandas as pd
+import torch
 from torch.utils.data import Dataset
+from torchvision import transforms
 import zarr
 
 class CellPatchesDataset(Dataset):
-    def __init__(self,filename,input_size=(256,256),use_mask=False):
-        self.metadata = pd.read_csv(filename)
+    def __init__(self,filename,input_size=(256,256),use_mask=False,augment=True):
+        metadata = pd.read_csv(filename)
         self.gene_symbols = {
             gi:gs for gs,gi in pd.unique(
-                list(zip(self.metadata['gene_symbol'], self.metadata['gene_id']))
+                list(zip(metadata['gene_symbol'], metadata['gene_id']))
             )
         }
         self.n_classes = len(self.gene_symbols)
@@ -19,18 +21,42 @@ class CellPatchesDataset(Dataset):
             self.xy_slicers = (slice(crop[0],-crop[0]),slice(crop[1],-crop[1]))
         else:
             self.xy_slicers = (slice(None),slice(None))
-        self.use_mask=False
+
+        self.augment=augment
+        self.augmentations = transforms.Compose([
+            transforms.RandomRotation(180, interpolation=transforms.InterpolationMode.BILINEAR),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomVerticalFlip(),
+            transforms.CenterCrop(128)
+        ])
+
+        self.labels = np.array(metadata['gene_id'])#.astype(np.int32)
+        self.stores = list(metadata['store'])
+        self.arrays = list(metadata['array'])
+        self.array_indices = np.array(metadata['array_index']).astype(np.int64)
+        self.use_mask=use_mask
 
     def __len__(self):
-        return self.metadata.pipe(len)
+        return len(self.labels)
 
     def __getitem__(self,index):
-        index_metadata = self.metadata.iloc[index]
-        z = zarr.open(index_metadata['store'])
-        x = z[index_metadata['array']][(index_metadata['array_index'],slice(None),*self.xy_slicers)]
+
+        array = self.arrays[index]
+        array_index = self.array_indices[index]
+
+        z = zarr.open(self.stores[index])
+        x = z[array][(array_index,slice(None),*self.xy_slicers)]
         assert x.dtype == np.uint16
         x = (x/(2**16 - 1)).astype(np.float32)
+
         if self.use_mask:
-            mask = z[index_metadata['array'].replace('images','cells')][(index_metadata['array_index'],*self.xy_slicers)]
+            mask = z[array.replace('images','cells')][(array_index,*self.xy_slicers)]
             x *= mask
-        return x, index_metadata['gene_id']
+
+        x = torch.from_numpy(x)
+
+        if self.augment:
+            x = self.augmentations(x)
+
+        label = self.labels[index]
+        return x, label
