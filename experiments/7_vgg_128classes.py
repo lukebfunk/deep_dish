@@ -11,16 +11,16 @@ from gemelli.train import VggModule
 parser = argparse.ArgumentParser()
 parser = pl.Trainer.add_argparse_args(parser)
 parser.add_argument('--use_mask',type=bool,default=False)
-parser.add_argument('--fmaps',type=int,default=32)
-parser.add_argument('--lr',type=float,default=1e-6)
+parser.add_argument('--fmaps',type=int,default=80)
+parser.add_argument('--lr',type=float,default=1e-5)
 parser.add_argument('--model_name',default=None)
 args = parser.parse_args()
 
 input_size=(128,128)
 pretransform_input_size=(256,256)
 
-train_dataset  = CellPatchesDataset('~/gemelli/dataset_info/0_train_samples.csv',input_size=pretransform_input_size,use_mask=args.use_mask,augment=True)
-val_dataset = CellPatchesDataset('~/gemelli/dataset_info/0_val_samples.csv',input_size=input_size,use_mask=args.use_mask,augment=Falsed)
+train_dataset  = CellPatchesDataset('~/gemelli/dataset_info/1_train_samples.csv',input_size=pretransform_input_size,use_mask=args.use_mask,augment=True)
+val_dataset = CellPatchesDataset('~/gemelli/dataset_info/1_val_samples.csv',input_size=input_size,use_mask=args.use_mask,augment=False)
 
 assert train_dataset.n_classes==val_dataset.n_classes
 print(f'total classes: {train_dataset.n_classes}')
@@ -40,10 +40,10 @@ checkpoint_callback = ModelCheckpoint(
         mode='max'
     )
 
-trainer = pl.Trainer.from_argparse_args(args, logger=logger, callbacks=[checkpoint_callback])
+trainer = pl.Trainer.from_argparse_args(args, logger=logger, callbacks=[checkpoint_callback], max_epochs=-1)
 
 trainer.fit(
     model,
-    BalancedDataLoader(train_dataset, batch_size=32,num_workers=10),
-    torch.utils.data.DataLoader(val_dataset, batch_size=32,num_workers=10)
+    BalancedDataLoader(train_dataset, batch_size=256,num_workers=20),
+    torch.utils.data.DataLoader(val_dataset, batch_size=256,num_workers=20)
 )

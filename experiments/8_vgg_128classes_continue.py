@@ -1,0 +1,56 @@
+import argparse
+from glob import glob
+import pytorch_lightning as pl
+from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
+import torch
+
+from gemelli.datasets import CellPatchesDataset
+from gemelli.dataloader import BalancedDataLoader
+from gemelli.train import VggModule
+
+parser = argparse.ArgumentParser()
+parser = pl.Trainer.add_argparse_args(parser)
+parser.add_argument('--use_mask',type=bool,default=False)
+parser.add_argument('--fmaps',type=int,default=80)
+parser.add_argument('--lr',type=float,default=1e-5)
+parser.add_argument('--model_name',default=None)
+parser.add_argument('--model_version',type=int,default=0)
+args = parser.parse_args()
+
+input_size=(128,128)
+pretransform_input_size=(256,256)
+
+train_dataset  = CellPatchesDataset('~/gemelli/dataset_info/1_train_samples.csv',input_size=pretransform_input_size,use_mask=args.use_mask,augment=True)
+val_dataset = CellPatchesDataset('~/gemelli/dataset_info/1_val_samples.csv',input_size=input_size,use_mask=args.use_mask,augment=False)
+
+assert train_dataset.n_classes==val_dataset.n_classes
+print(f'total classes: {train_dataset.n_classes}')
+
+num_channels = train_dataset[0][0].shape[0]
+print(f'input shape: {train_dataset[0][0].shape}')
+
+checkpoint = glob(f'logs/{args.model_name}/version_{args.model_version}/checkpoints/epoch*.ckpt')[0]
+
+model = VggModule.load_from_checkpoint(checkpoint,input_channels=num_channels, output_classes=train_dataset.n_classes, fmaps=args.fmaps, input_size=input_size, learning_rate=args.lr)
+
+# model = VggModule(input_channels=num_channels, output_classes=train_dataset.n_classes, fmaps=args.fmaps, input_size=input_size, learning_rate=args.lr)
+
+logger = TensorBoardLogger("logs",name=args.model_name)
+
+checkpoint_callback = ModelCheckpoint(
+        monitor='val_accuracy',
+        filename='epoch{epoch:02d}-val_accuracy{val_accuracy:.2f}',
+        auto_insert_metric_name=False,
+        save_last=True,
+        mode='max'
+    )
+
+trainer = pl.Trainer.from_argparse_args(args, logger=logger, callbacks=[checkpoint_callback], max_epochs=-1)
+
+trainer.fit(
+    model,
+    BalancedDataLoader(train_dataset, batch_size=256,num_workers=48),
+    torch.utils.data.DataLoader(val_dataset, batch_size=256,num_workers=48),
+    ckpt_path=checkpoint
+)
