@@ -3,6 +3,7 @@ from pytorch_lightning import LightningModule
 import torch
 import torchmetrics
 
+from .dataloader import DistributedBalancedDataLoader
 
 class VggModule(LightningModule):
     def __init__(self, input_channels, output_classes, fmaps=32, input_size=(256,256), learning_rate=1e-5):
@@ -113,3 +114,17 @@ class ResNetModule(LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
         return optimizer
+
+class DistributedVggModule(VggModule):
+    def __init__(self,*args,train_dataset=None,val_dataset=None,batch_size=16,num_workers=None,**kwargs):
+        self.train_dataset = train_dataset
+        self.val_dataset = val_dataset
+        self.batch_size=batch_size
+        self.num_workers=num_workers
+        super().__init__(*args,**kwargs)
+
+    def train_dataloader(self):
+        return DistributedBalancedDataLoader(self.train_dataset,self.batch_size,num_workers=self.num_workers)
+
+    def val_dataloader(self):
+        return torch.utils.data.DataLoader(self.val_dataset,self.batch_size,num_workers=self.num_workers,shuffle=False)
