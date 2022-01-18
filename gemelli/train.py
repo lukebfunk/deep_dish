@@ -6,7 +6,7 @@ import torchmetrics
 from .dataloader import DistributedBalancedDataLoader
 
 class VggModule(LightningModule):
-    def __init__(self, input_channels, output_classes, fmaps=32, input_size=(256,256), learning_rate=1e-5):
+    def __init__(self, input_channels, output_classes, fmaps=32, input_size=(256,256), learning_rate=1e-5, log_images=True, cm_normalization='true'):
         super().__init__()
         self.model = Vgg2D(input_size=input_size,fmaps=fmaps,output_classes=output_classes,input_fmaps=input_channels)
         self.loss = torch.nn.CrossEntropyLoss()
@@ -14,7 +14,8 @@ class VggModule(LightningModule):
         self.weighted_accuracy = torchmetrics.Accuracy(average='weighted',num_classes=output_classes)
         self.softmax = torch.nn.Softmax(dim=1)
         self.learning_rate = learning_rate
-        self.confusion_matrix = torchmetrics.ConfusionMatrix(num_classes=output_classes,compute_on_step=False,normalize='true')
+        self.log_images = log_images
+        self.confusion_matrix = torchmetrics.ConfusionMatrix(num_classes=output_classes,compute_on_step=False,normalize=cm_normalization)
     
     def forward(self,x):
         x = self.model(x)
@@ -26,12 +27,13 @@ class VggModule(LightningModule):
         loss = self.loss(logits,y)
         self.log("train_loss",loss)
         y_hat = self.softmax(logits)
-        if self.global_step%200 == 0:
-            log_images =  x[:8,:3] - torch.amin(x[:8,:3],dim=(0,2,3),keepdim=True)
-            log_images = log_images / torch.amax(log_images,dim=(0,2,3),keepdim=True)
-            self.logger.experiment.add_images("input",log_images)
-            self.logger.experiment.add_text("labels",', '.join(map(str,y[:8].cpu().numpy())))
-            self.logger.experiment.add_text("predictions",', '.join(map(str,y_hat[:8].argmax(axis=1).cpu().numpy())))
+        if self.log_images:
+            if self.global_step%200 == 0:
+                log_images =  x[:8,:3] - torch.amin(x[:8,:3],dim=(0,2,3),keepdim=True)
+                log_images = log_images / torch.amax(log_images,dim=(0,2,3),keepdim=True)
+                self.logger.experiment.add_images("input",log_images)
+                self.logger.experiment.add_text("labels",', '.join(map(str,y[:8].cpu().numpy())))
+                self.logger.experiment.add_text("predictions",', '.join(map(str,y_hat[:8].argmax(axis=1).cpu().numpy())))
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -61,7 +63,7 @@ class VggModule(LightningModule):
         return optimizer
 
 class ResNetModule(LightningModule):
-    def __init__(self,input_channels,output_classes,fmaps=32,input_size=(256,256),learning_rate=1e-5):
+    def __init__(self,input_channels,output_classes,fmaps=32,input_size=(256,256),learning_rate=1e-5, log_images=True, cm_normalization='true'):
         super().__init__()
         self.model = ResNet(input_size=input_size,output_classes=output_classes,fmaps=fmaps,input_fmaps=input_channels)
         self.loss = torch.nn.CrossEntropyLoss()
@@ -69,7 +71,8 @@ class ResNetModule(LightningModule):
         self.weighted_accuracy = torchmetrics.Accuracy(average='weighted',num_classes=output_classes)
         self.softmax = torch.nn.Softmax(dim=1)
         self.learning_rate = learning_rate
-        self.confusion_matrix = torchmetrics.ConfusionMatrix(num_classes=output_classes,compute_on_step=False,normalize='true')
+        self.log_images = log_images
+        self.confusion_matrix = torchmetrics.ConfusionMatrix(num_classes=output_classes,compute_on_step=False,normalize=cm_normalization)
 
     def forward(self,x):
         x = self.model(x)
@@ -81,12 +84,13 @@ class ResNetModule(LightningModule):
         loss = self.loss(logits,y)
         self.log("train_loss",loss)
         y_hat = self.softmax(logits)
-        if self.global_step%200 == 0:
-            log_images =  x[:8,:3] - torch.amin(x[:8,:3],dim=(0,2,3),keepdim=True)
-            log_images = log_images / torch.amax(log_images,dim=(0,2,3),keepdim=True)
-            self.logger.experiment.add_images("input",log_images)
-            self.logger.experiment.add_text("labels",', '.join(map(str,y[:8].cpu().numpy())))
-            self.logger.experiment.add_text("predictions",', '.join(map(str,y_hat[:8].argmax(axis=1).cpu().numpy())))
+        if self.log_images:
+            if self.global_step%200 == 0:
+                log_images =  x[:8,:3] - torch.amin(x[:8,:3],dim=(0,2,3),keepdim=True)
+                log_images = log_images / torch.amax(log_images,dim=(0,2,3),keepdim=True)
+                self.logger.experiment.add_images("input",log_images)
+                self.logger.experiment.add_text("labels",', '.join(map(str,y[:8].cpu().numpy())))
+                self.logger.experiment.add_text("predictions",', '.join(map(str,y_hat[:8].argmax(axis=1).cpu().numpy())))
         return loss
 
     def validation_step(self, batch, batch_idx):
