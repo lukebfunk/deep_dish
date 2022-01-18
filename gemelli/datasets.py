@@ -6,13 +6,27 @@ from torchvision import transforms
 import zarr
 
 class CellPatchesDataset(Dataset):
-    def __init__(self,filename,input_size=(256,256),use_mask=False,augment=True):
+    def __init__(self,filename,input_size=(256,256),use_mask=False,augment=True,restrict_query=None):
         metadata = pd.read_csv(filename)
-        self.gene_symbols = {
-            gi:gs for gs,gi in pd.unique(
-                list(zip(metadata['gene_symbol'], metadata['gene_id']))
-            )
-        }
+
+        # for restricting training set
+        if restrict_query is not None:
+            metadata = metadata.query(restrict_query).sort_values('gene_id')
+            # reassign class labels (same order as before)
+            self.gene_symbols = {
+                n:gs for n,(gs,_) in enumerate(pd.unique(
+                    list(zip(metadata['gene_symbol'], metadata['gene_id'])))
+                )
+            }
+            gene_ids = {gs:gi for gi,gs in self.gene_symbols.items()}
+            metadata['gene_id'] = metadata['gene_symbol'].map(gene_ids)
+        else:
+            self.gene_symbols = {
+                gi:gs for gs,gi in pd.unique(
+                    list(zip(metadata['gene_symbol'], metadata['gene_id']))
+                )
+            }
+
         self.n_classes = len(self.gene_symbols)
         self.input_size=input_size
         if self.input_size!=(256,256):
