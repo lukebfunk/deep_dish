@@ -8,5 +8,5 @@ sorted_tpr = list(tpr.sort_values(ascending=False).index)
 
 command = 'bsub -n 5 -J {gene} -gpu "num=1" -q gpu_rtx python ~/gemelli/experiments/11_one_vs_control_training.py --gene {gene} --model_name {gene} --fmaps 16 --gpus 1 --lr 1e-6'
 
-for gene in sorted_tpr[:64]:
+for gene in sorted_tpr:
     subprocess.Popen(command.format(gene=gene),shell=True)
